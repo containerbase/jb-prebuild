@@ -1,0 +1,120 @@
+name: build
+
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      checks: write # shellcheck annotations
+    env:
+      # node and pnpm come from the setup action, so `mise exec` must not
+      # install them again
+      MISE_EXEC_AUTO_INSTALL: 'false'
+
+    steps:
+      - name: ⚙️ Setup
+        uses: containerbase/internal-tools/setup@c0edd0d701889647e47d726641bcba2a6d92eabe # v5.3.6
+        with:
+          save-cache: true
+
+      - name: lint
+        run: pnpm oxfmt
+
+      - name: Install the workflow linters
+        uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5.2.2
+        with:
+          install_args: jactionlint shellcheck zizmor
+
+      - name: Check workflow files
+        run: mise exec -- jactionlint --color
+
+      - name: Run zizmor
+        run: mise exec -- zizmor --format github .github/
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: shellcheck
+        if: ${{ github.event_name != 'merge_group' }}
+        uses: reviewdog/action-shellcheck@d0b8d5fd7fad6afdb6e1b6ce1778892be4d1f427 # v1.34.1
+        with:
+          fail_level: any
+          reporter: github-pr-annotations
+          filter_mode: nofilter
+          path: |
+            bin
+            test
+            .husky
+          pattern: |
+            *.sh
+          exclude: |
+            ./.git/*
+            ./.husky/_/*
+          check_all_files_with_shebangs: 'true'
+
+  build:
+    needs:
+      - lint
+    runs-on: ${{ matrix.arch.os }}
+    timeout-minutes: 60
+    name: build (${{ matrix.arch.name }})
+
+    permissions:
+      contents: write
+
+    strategy:
+      matrix:
+        arch:
+          - name: x86_64
+            os: ubuntu-24.04
+          - name: aarch64
+            os: ubuntu-24.04-arm # too unstable
+
+    env:
+      ARCH: ${{ matrix.arch.name }} # build target, name required by binary-builder
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          show-progress: false
+
+      - name: binary-builder
+        uses: containerbase/internal-tools@c0edd0d701889647e47d726641bcba2a6d92eabe # v5.3.6
+        with:
+          command: binary-builder
+          dry-run: ${{github.ref != 'refs/heads/main'}}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  success:
+    runs-on: ubuntu-slim
+    needs:
+      - lint
+      - build
+    timeout-minutes: 1
+    if: always()
+    steps:
+      - name: Fail for failed or cancelled build
+        if: |
+          needs.build.result == 'failure' ||
+          needs.build.result == 'cancelled'
+        run: exit 1
+      - name: Fail for failed or cancelled lint
+        if: |
+          needs.lint.result == 'failure' ||
+          needs.lint.result == 'cancelled'
+        run: exit 1
