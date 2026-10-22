@@ -66,6 +66,24 @@ jobs:
             ./.husky/_/*
           check_all_files_with_shebangs: 'true'
 
+  check-versions:
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # the merge commit and its first parent, the base branch
+          fetch-depth: 2
+          persist-credentials: false
+          show-progress: false
+
+      - name: Check for a new version on rebuild triggers
+        run: bin/check-versions.sh HEAD^1
+
   build:
     needs:
       - lint
@@ -104,6 +122,7 @@ jobs:
     runs-on: ubuntu-slim
     needs:
       - lint
+      - check-versions
       - build
     timeout-minutes: 1
     if: always()
@@ -117,4 +136,9 @@ jobs:
         if: |
           needs.lint.result == 'failure' ||
           needs.lint.result == 'cancelled'
+        run: exit 1
+      - name: Fail for failed or cancelled check-versions
+        if: |
+          needs.check-versions.result == 'failure' ||
+          needs.check-versions.result == 'cancelled'
         run: exit 1

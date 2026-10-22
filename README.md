@@ -14,7 +14,7 @@ The versions are listed in `versions` in `builder.json`, newest last.
 - Go update (Renovate PR on `Dockerfile`): add the next counter for the latest upstream version to that PR, eg. `0.6.0.2`.
 - Upstream release (Renovate PR on `renovate.Dockerfile`): add `<version>.1`, eg. `0.7.0.1`.
 
-Existing releases are never rebuilt.
+Existing releases are never rebuilt, so CI fails a pull request that changes one of these triggers without adding a version ([`bin/check-versions.sh`](bin/check-versions.sh)).
 
 Before each upload, `binary-builder` runs [`bin/test.sh`](bin/test.sh), which tests the archive in a plain container of each distro: a static binary, the upstream version, and the `jb install` and `jb update` runs of Renovate's jsonnet-bundler manager on [`test/jsonnetfile.json`](test/jsonnetfile.json).
 
