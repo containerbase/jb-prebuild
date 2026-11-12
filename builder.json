@@ -1,7 +1,7 @@
 {
   "image": "jb",
   "depName": "jsonnet-bundler/jsonnet-bundler",
-  "versioning": "loose",
+  "versioning": "semver-extended",
   "startVersion": "0.6.0.1",
   "versions": ["0.6.0.1"],
   "test": "bin/test.sh"
