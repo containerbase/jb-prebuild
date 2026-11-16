@@ -3,6 +3,6 @@
   "depName": "jsonnet-bundler/jsonnet-bundler",
   "versioning": "loose",
   "startVersion": "0.6.0.1",
-  "versions": ["0.6.0.1"],
+  "versions": ["0.6.0.1", "0.6.0.2"],
   "test": "bin/test.sh"
 }
